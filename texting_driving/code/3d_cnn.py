@@ -1,6 +1,18 @@
 
+# Author: Raj Agrawal 
+
+# Builds a 3D spatio-temporal convolutional neural network to detect texting and 
+# driving from a video stream 
+
+# Quick Architectural Overview:
+# - 3 convolutional layers (ReLu, Dropout, MaxPooling), 2 dense layers
+# - Binary Hinge-Loss 
+# - Nesterov Momentum update w/ learning rate decaying linearly w/ num. epochs 
+# - Early Stopping 
+
 # References: See paper. Special thanks to Daniel Nouri for his tutorial at 
-# http://danielnouri.org/notes/category/machine-learning/ 
+# http://danielnouri.org/notes/category/machine-learning/ (Some code snippets  
+# taken directly from this tutorial) 
 
 from __future__ import division 
 
@@ -15,20 +27,20 @@ from lasagne.layers.shape import PadLayer
 from lasagne.layers import InputLayer, DenseLayer, NonlinearityLayer, DropoutLayer
 from lasagne.layers.dnn import Conv3DDNNLayer, MaxPool3DDNNLayer
 from lasagne.objectives import binary_hinge_loss
-from lasagne.updates import adam
+from lasagne.updates import nesterov_momentum
 from lasagne import layers
 
 from nolearn.lasagne import NeuralNet
 from nolearn.lasagne import BatchIterator
 
-def build_model():
-    '''
+def build_cnn():
+    """
     Builds 3D spatio-temporal CNN model
     Returns
     -------
     dict
         A dictionary containing the network layers, where the output layer is at key 'output'
-    '''
+    """
     net = {}
     net['input'] = InputLayer((None, 1, 10, 108, 192))
 
@@ -119,11 +131,11 @@ class EarlyStopping(object):
             nn.load_params_from(self.best_weights)
             raise StopIteration()
 
-layers = build_model()
+layers = build_cnn()
 
 network = NeuralNet(
     layers=layers['output'],
-    max_epochs=1000,
+    max_epochs=5000,
     
     update=nesterov_momentum,
     objective_loss_function=binary_hinge_loss,
@@ -142,24 +154,13 @@ network = NeuralNet(
     verbose=1
 )
 
+if __name__ == '__main__':
 
+    # Load data 
 
-network.fit(X, Y)
+    # Preprocess 
+    
+    # Fit model 
+    network.fit(X, Y)
 
-# prediction = lasagne.layers.get_output(network)
-
-# loss = lasagne.objectives.binary_hinge_loss(prediction, target_var)
-# loss = loss.mean() 
-
-# params = lasagne.layers.get_all_params(network, trainable=True)
-# updates = lasagne.updates.adam(loss, params) #Use default learning rate, hyperparams
-
-
-
-
-
-
-
-
-
-
+    # Save Model 
