@@ -21,7 +21,7 @@ import theano
 import numpy as np
 import skimage.transform
 from skimage import color
-import pickle
+import cPickle as pickle
 
 from lasagne.layers.shape import PadLayer
 from lasagne.layers import InputLayer, DenseLayer, NonlinearityLayer, DropoutLayer
@@ -33,9 +33,10 @@ from lasagne import layers
 from nolearn.lasagne import NeuralNet
 from nolearn.lasagne import BatchIterator
 
+# TODO: Fix up/verify arch. and sizes 
 def build_cnn():
     """
-    Builds 3D spatio-temporal CNN model
+    Builds a 3D spatio-temporal CNN 
     Returns
     -------
     dict
@@ -69,7 +70,10 @@ def build_cnn():
 
     return net
 
+# Place to modify how to tune momentum and learning rate 
 class AdjustVariable(object):
+    """
+    """
     def __init__(self, name, start=0.03, stop=0.001):
         self.name = name
         self.start, self.stop = start, stop
@@ -83,7 +87,13 @@ class AdjustVariable(object):
         new_value = float32(self.ls[epoch - 1])
         getattr(nn, self.name).set_value(new_value)
 
+# Place to add more variety - specify some proportion in each cat. to alter
+# Could preprocess here as well? 
 class FlipBatchIterator(BatchIterator):
+    """
+    """
+
+    # Flip images 
     flip_indices = [
         (0, 2), (1, 3),
         (4, 8), (5, 9), (6, 10), (7, 11),
@@ -91,26 +101,35 @@ class FlipBatchIterator(BatchIterator):
         (22, 24), (23, 25),
         ]
 
+    # Change intensities values 
+    # TODO: Put 3 different types of things based on number 1, 2, 3 (that will
+    # be randomly drawn), translate, etc. see famous Krivensky paper  
+
     def transform(self, Xb, yb):
         Xb, yb = super(FlipBatchIterator, self).transform(Xb, yb)
 
         # Flip half of the images in this batch at random:
         bs = Xb.shape[0]
         indices = np.random.choice(bs, bs / 2, replace=False)
-        Xb[indices] = Xb[indices, :, :, ::-1]
+        Xb[indices] = Xb[indices, :, :, ::-1] #FIX: Ours is different matrix struct. 
 
-        if yb is not None:
-            # Horizontal flip of all x coordinates:
-            yb[indices, ::2] = yb[indices, ::2] * -1
+        # if yb is not None:
+        #     # Horizontal flip of all x coordinates:
+        #     yb[indices, ::2] = yb[indices, ::2] * -1
 
-            # Swap places, e.g. left_eye_center_x -> right_eye_center_x
-            for a, b in self.flip_indices:
-                yb[indices, a], yb[indices, b] = (
-                    yb[indices, b], yb[indices, a])
+        #     # Swap places, e.g. left_eye_center_x -> right_eye_center_x
+        #     for a, b in self.flip_indices:
+        #         yb[indices, a], yb[indices, b] = (
+        #             yb[indices, b], yb[indices, a])
 
         return Xb, yb
 
+# This gets called whenever finish epoch. If I want to save weights every x epochs
+# this is where to do it - maybe set number of max_epochs high since then will just
+# early stop 
 class EarlyStopping(object):
+    """
+    """
     def __init__(self, patience=100):
         self.patience = patience
         self.best_valid = np.inf
@@ -120,6 +139,9 @@ class EarlyStopping(object):
     def __call__(self, nn, train_history):
         current_valid = train_history[-1]['valid_loss']
         current_epoch = train_history[-1]['epoch']
+        
+        #Save weights to s3 every 20 epochs 
+
         if current_valid < self.best_valid:
             self.best_valid = current_valid
             self.best_valid_epoch = current_epoch
@@ -144,23 +166,33 @@ network = NeuralNet(
     update_momentum=theano.shared(float32(0.9)),
     
     regression=False,
-    batch_iterator_train=FlipBatchIterator(batch_size=128)
+    batch_iterator_train=FlipBatchIterator(batch_size=128, shuffle=False) #Data already shuffled 
     on_epoch_finished=[
         AdjustVariable('update_learning_rate', start=0.03, stop=0.0001),
         AdjustVariable('update_momentum', start=0.9, stop=0.999),
-        EarlyStopping(patience=200),
+        EarlyStopping(patience=200)
         ],
 
     verbose=1
 )
 
+#Fix but make sure to multiply by different p's b/c dropout 
+def predict(X):
+  # ensembled forward pass
+  H1 = np.maximum(0, np.dot(W1, X) + b1) * p # NOTE: scale the activations
+  H2 = np.maximum(0, np.dot(W2, H1) + b2) * p # NOTE: scale the activations
+  out = np.dot(W3, H2) + b3
+
 if __name__ == '__main__':
 
-    # Load data 
+    # Load data (did not standardize b/c images in 0-256)
+    X = np.load('./data/train/images_by_time_mat') 
+    Y = np.load('./data/train/labels')
 
-    # Preprocess 
-    
     # Fit model 
     network.fit(X, Y)
 
     # Save Model 
+    with open('network.pickle', 'wb') as f:
+        pickle.dump(net3, f, -1)
+        pickle.dump(network, './models/3dcnn')

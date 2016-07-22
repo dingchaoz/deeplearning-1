@@ -2,17 +2,21 @@
 #Raj Agrawal 
 #July 12, 2016 
 
-"""
-The following script reads in all images stored in a root directory and converts 
-the images to an array.
+# The following script reads in all images stored in a root directory and converts 
+# the images to an array.
 
-Note: The root directory should just contain the desired images (o/w there
-will be an error reading in a non-image) 
-"""
+# Note: The root directory should just contain the desired images (o/w there
+# will be an error reading in a non-image) 
+
+# Run $ffmpeg -i NAME.MOV -r 20 ./photo_videos/image_sequence%06d.jpeg to 
+# generate images 
+
+from __future__ import division 
 
 import os
 import glob
 import numpy as np
+import pandas as pd 
 import matplotlib.pyplot as plt
 
 from scipy.misc import imread 
@@ -29,10 +33,10 @@ def readImage(path, reduction_factor=.1):
 def to3DMatrix(paths, imgsize=(108, 192), num_frames):
     # Randomize?
     num_images = len(paths)
-    images_by_time = np.zeros(shape=(108, 192, num_images)) #TODO fix so input imgsize
+    images_by_time = np.zeros(shape=(num_images, 108, 192)) #TODO fix so input imgsize
     for i, path in enumerate(paths):
         image = readImage(path)
-        images_by_time[:, :, i] = image
+        images_by_time[i, :, :] = image
         print('Finished Processing image ' + str(i))
     return images_by_time
 
@@ -40,35 +44,67 @@ def toMatrix(paths, imgsize=(108, 192), num_frames):
     # Randomize?
     num_images = len(paths)
     num_samples = num_images / num_frames 
-    images_by_time = np.zeros(shape=(num_samples, 108, 192, num_frames))
+    images_by_time = np.zeros(shape=(num_samples, num_frames, 108, 192))
     for sample_index in range(num_samples):
         index_in_array = sample_index * num_frames
         sample_paths = paths[index_in_array:(num_frames + index_in_array)]
         sample = to3DMatrix(sample_paths, imgsize, num_frames)
-        images_by_time.concatenate(sample, axis=4)
+        images_by_time.concatenate(sample, axis=1)
         print('Finished Processing Sample ' + str(sample_index))
     return images_by_time
 
-def makeLabels(file, paths):
+def toDurations(stopped_times_list):
+    to_seconds = []
+    for time in stopped_times_list:
+        print(time)
+        mins, secs = time.split(':') 
+        if mins == '':
+            mins = 0
+        to_sec = int(mins) * 60 + int(secs) 
+        to_seconds.append(to_sec)
+    num_times = len(to_seconds)
+    from_zero = [0] + to_seconds[0:(num_times - 1)]
+    time_diffs = np.array(to_seconds) - np.array(from_zero)
+    return time_diffs
 
-#TODO: Need to make paths ordered so that images are in same 
-#order 
+#Check to make sure this matches X --> might need to pad ends w/ extra labels 
+def makeLabels(file_label, samps_per_sec=2):
+    """
+    - Frames happen every .05 seconds, one sample corresponds w/ 10 frames or
+      2 samples / seconds
+    """
+    labels_by_time = pd.read_csv(file_label, header=None)
+    to_durations = toDurations(list(labels_by_time[1]))
+    labels_per_phase = list(labels_by_time[0])
+    num_samps_per_sec = to_durations * samps_per_sec
+    sample_labels = []
+    for i, label in enumerate(labels_per_phase):
+        num_samps = num_samps_per_phase[i]
+        sample_labels += list(np.tile(label, num_samps))
+    return np.array(sample_labels)
+
 def makePaths(folder_root):
     """
     - Returns the paths of all files in the folder_root 
     """
     return glob.glob(os.path.join(folder_root, '*'))
 
+def makeOrderedPaths(folder_root, num_pics):
+    """
+    - Returns the paths of all files in the folder_root 
+    """
+    paths = [folder_root + 'image_sequence' + str(i) + '.jpeg' for i in range(1, num_pics + 1)]
+    return paths
+
 if __name__ == '__main__':
 
-    path_to_images = raw_input('Enter Path to Images (no quotes):')
+    path_to_images = './data/train/images'
+    path_to_lables = './data/train/labels/video_labels.csv'
     
-    # TODO: Make connnect to S3 
-
-    # Read in data and save as a matrix 
-    paths = makePaths(path_to_images)
-    images_by_time = toMatrix(paths)
-    np.save('./combined_data/images_by_time_mat', images_by_time)
-    np.save('./combined_data/paths', paths)
-    # Look at at image at time = 10
-    # plt.imshow(images_by_time[:, :, 10], cmap='Greys_r')
+    # Read in video data/labels, shuffle, and save as a matrix 
+    paths = makeOrderedPaths(path_to_images)
+    images_by_time = toMatrix(paths=paths, num_frames=10)
+    labels = makeLabels(path_to_lables, samps_per_sec=2)
+    np.random.shuffle(images_by_time, labels) #Shuffle data 
+    np.save('./data/train/images_by_time_mat', images_by_time)
+    np.save('./data/train/labels', labels)
