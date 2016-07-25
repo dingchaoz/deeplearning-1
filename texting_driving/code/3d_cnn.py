@@ -1,4 +1,3 @@
-
 # Author: Raj Agrawal 
 
 # Builds a 3D spatio-temporal convolutional neural network to detect texting and 
@@ -11,8 +10,9 @@
 # - Early Stopping 
 
 # References: See paper. Special thanks to Daniel Nouri for his tutorial at 
-# http://danielnouri.org/notes/category/machine-learning/ (Some code snippets  
-# taken directly from this tutorial) 
+# http://danielnouri.org/notes/category/machine-learning/ 
+
+# TODO: check this and prev code for say 20/5 = 4.0 convert to int 
 
 from __future__ import division 
 
@@ -69,10 +69,10 @@ def build_cnn():
     net['output']  = DenseLayer(net['fc5'], num_units=256, nonlinearity=None)
 
     return net
-
-# Place to modify how to tune momentum and learning rate 
+ 
 class AdjustVariable(object):
     """
+    Class controlling how to tune the momentum and learning rate
     """
     def __init__(self, name, start=0.03, stop=0.001):
         self.name = name
@@ -88,19 +88,9 @@ class AdjustVariable(object):
         getattr(nn, self.name).set_value(new_value)
 
 # Place to add more variety - specify some proportion in each cat. to alter
-# Could preprocess here as well? 
 class FlipBatchIterator(BatchIterator):
     """
     """
-
-    # Flip images 
-    flip_indices = [
-        (0, 2), (1, 3),
-        (4, 8), (5, 9), (6, 10), (7, 11),
-        (12, 16), (13, 17), (14, 18), (15, 19),
-        (22, 24), (23, 25),
-        ]
-
     # Change intensities values 
     # TODO: Put 3 different types of things based on number 1, 2, 3 (that will
     # be randomly drawn), translate, etc. see famous Krivensky paper  
@@ -108,25 +98,17 @@ class FlipBatchIterator(BatchIterator):
     def transform(self, Xb, yb):
         Xb, yb = super(FlipBatchIterator, self).transform(Xb, yb)
 
-        # Flip half of the images in this batch at random:
+        # Distort half of the images in this batch at random:
         bs = Xb.shape[0]
         indices = np.random.choice(bs, bs / 2, replace=False)
-        Xb[indices] = Xb[indices, :, :, ::-1] #FIX: Ours is different matrix struct. 
-
-        # if yb is not None:
-        #     # Horizontal flip of all x coordinates:
-        #     yb[indices, ::2] = yb[indices, ::2] * -1
-
-        #     # Swap places, e.g. left_eye_center_x -> right_eye_center_x
-        #     for a, b in self.flip_indices:
-        #         yb[indices, a], yb[indices, b] = (
-        #             yb[indices, b], yb[indices, a])
-
+        distorts_per_cat = int(len(indices) / 4)
+        flip_indcs = indices[0:distorts_per_cat]
+        change_hue_indcs = 
+        rotate_indcs = 
+        Xb[flip_indcs] = Xb[indices, :, :, ::-1, :] #Verify good flip  
         return Xb, yb
 
-# This gets called whenever finish epoch. If I want to save weights every x epochs
-# this is where to do it - maybe set number of max_epochs high since then will just
-# early stop 
+# maybe set number of max_epochs high since then will just
 class EarlyStopping(object):
     """
     """
@@ -135,17 +117,27 @@ class EarlyStopping(object):
         self.best_valid = np.inf
         self.best_valid_epoch = 0
         self.best_weights = None
+        self.num_epochs = 0 
 
     def __call__(self, nn, train_history):
         current_valid = train_history[-1]['valid_loss']
         current_epoch = train_history[-1]['epoch']
-        
-        #Save weights to s3 every 20 epochs 
+        self.num_epochs += 1 
 
+        # Save weights every 20 epochs to server (transport to s3 eventually)
+        if self.num_epochs % 20 == 0:
+            weights = nn.get_all_params_values()
+            weight_path = './data/train/weights/cnn' + self.num_epochs
+            with open(weight_path, 'wb') as f:
+                pickle.dump(weights, f, -1)
+
+        # Update pointer if there are better weights 
         if current_valid < self.best_valid:
             self.best_valid = current_valid
             self.best_valid_epoch = current_epoch
             self.best_weights = nn.get_all_params_values()
+        
+        # Seems like we might be starting to overfit 
         elif self.best_valid_epoch + self.patience < current_epoch:
             print("Early stopping.")
             print("Best valid loss was {:.6f} at epoch {}.".format(
@@ -153,6 +145,14 @@ class EarlyStopping(object):
             nn.load_params_from(self.best_weights)
             raise StopIteration()
 
+# Fix but make sure to multiply by different p's b/c dropout 
+def predict(X):
+  # ensembled forward pass
+  H1 = np.maximum(0, np.dot(W1, X) + b1) * p # NOTE: scale the activations
+  H2 = np.maximum(0, np.dot(W2, H1) + b2) * p # NOTE: scale the activations
+  out = np.dot(W3, H2) + b3
+ 
+# Build CNN
 layers = build_cnn()
 
 network = NeuralNet(
@@ -176,23 +176,15 @@ network = NeuralNet(
     verbose=1
 )
 
-#Fix but make sure to multiply by different p's b/c dropout 
-def predict(X):
-  # ensembled forward pass
-  H1 = np.maximum(0, np.dot(W1, X) + b1) * p # NOTE: scale the activations
-  H2 = np.maximum(0, np.dot(W2, H1) + b2) * p # NOTE: scale the activations
-  out = np.dot(W3, H2) + b3
-
 if __name__ == '__main__':
 
     # Load data (did not standardize b/c images in 0-256)
-    X = np.load('./data/train/images_by_time_mat') 
-    Y = np.load('./data/train/labels')
+    X = np.load('./data/train/images_by_time_mat.npy') 
+    Y = np.load('./data/train/labels.npy')
 
     # Fit model 
     network.fit(X, Y)
 
     # Save Model 
-    with open('network.pickle', 'wb') as f:
-        pickle.dump(net3, f, -1)
-        pickle.dump(network, './models/3dcnn')
+    with open('.model/network.pickle', 'wb') as f:
+        pickle.dump(network, f, -1)
