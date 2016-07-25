@@ -33,8 +33,10 @@ from lasagne import layers
 from nolearn.lasagne import NeuralNet
 from nolearn.lasagne import BatchIterator
 
+from random_image_generator import * 
+
 # TODO: Fix up/verify arch. and sizes 
-def build_cnn():
+def build_cnn(): #Change take as input image size 
     """
     Builds a 3D spatio-temporal CNN 
     Returns
@@ -87,25 +89,28 @@ class AdjustVariable(object):
         new_value = float32(self.ls[epoch - 1])
         getattr(nn, self.name).set_value(new_value)
 
-# Place to add more variety - specify some proportion in each cat. to alter
 class FlipBatchIterator(BatchIterator):
     """
-    """
-    # Change intensities values 
-    # TODO: Put 3 different types of things based on number 1, 2, 3 (that will
-    # be randomly drawn), translate, etc. see famous Krivensky paper  
-
+    Note: Did not alter intensity values b/c already did that (1.5x increase of
+          raw data size by artifically adding modified intensity values)
+    """ 
     def transform(self, Xb, yb):
         Xb, yb = super(FlipBatchIterator, self).transform(Xb, yb)
 
         # Distort half of the images in this batch at random:
         bs = Xb.shape[0]
-        indices = np.random.choice(bs, bs / 2, replace=False)
+        num_changes = int(bs * .75)
+        indices = np.random.choice(bs, num_changes, replace=False)
         distorts_per_cat = int(len(indices) / 4)
         flip_indcs = indices[0:distorts_per_cat]
-        change_hue_indcs = 
-        rotate_indcs = 
-        Xb[flip_indcs] = Xb[indices, :, :, ::-1, :] #Verify good flip  
+        flip_indcs2 = indices[distorts_per_cat:(2*distorts_per_cat)]
+        flip_indcs3 = indices[(2*distorts_per_cat):(3*distorts_per_cat)]
+        rotate_indcs = indices[(3*distorts_per_cat):(4*distorts_per_cat)]
+        Xb[flip_indcs] = Xb[flip_indcs, :, ::-1, :] #Verify good flip 
+        Xb[flip_indcs2] = Xb[flip_indcs2, :, :, ::-1] 
+        Xb[flip_indcs3] = Xb[flip_indcs3, :, ::-1, ::-1]
+        for i in rotate_indcs:
+            Xb[i, :, :, :] = random_image_generator(Xb[i, :, :, :])
         return Xb, yb
 
 # maybe set number of max_epochs high since then will just
@@ -127,7 +132,7 @@ class EarlyStopping(object):
         # Save weights every 20 epochs to server (transport to s3 eventually)
         if self.num_epochs % 20 == 0:
             weights = nn.get_all_params_values()
-            weight_path = './data/train/weights/cnn' + self.num_epochs
+            weight_path = '../data/train/weights/cnn' + self.num_epochs
             with open(weight_path, 'wb') as f:
                 pickle.dump(weights, f, -1)
 
@@ -186,5 +191,5 @@ if __name__ == '__main__':
     network.fit(X, Y)
 
     # Save Model 
-    with open('.model/network.pickle', 'wb') as f:
+    with open('../model/network.pickle', 'wb') as f:
         pickle.dump(network, f, -1)
