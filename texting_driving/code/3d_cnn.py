@@ -19,11 +19,8 @@ from __future__ import division
 import lasagne
 import theano
 import numpy as np
-import skimage.transform
-from skimage import color
 import cPickle as pickle
 
-from lasagne.layers.shape import PadLayer
 from lasagne.layers import InputLayer, DenseLayer, NonlinearityLayer, DropoutLayer
 from lasagne.layers.dnn import Conv3DDNNLayer, MaxPool3DDNNLayer
 from lasagne.objectives import binary_hinge_loss
@@ -47,17 +44,17 @@ def build_layers():
         ('input', InputLayer),
         ('conv1', Conv3DDNNLayer),
         ('pool1', MaxPool3DDNNLayer),
-        ('dropout1', layers.DropoutLayer),  
+        ('dropout1', DropoutLayer),  
         ('conv2', Conv3DDNNLayer),
         ('pool2', MaxPool3DDNNLayer),
-        ('dropout2', layers.DropoutLayer),  
+        ('dropout2', DropoutLayer),  
         ('conv3', Conv3DDNNLayer),
         ('pool3', MaxPool3DDNNLayer),
-        ('dropout3', layers.DropoutLayer),  
-        ('hidden4', layers.DenseLayer),
-        ('dropout4', layers.DropoutLayer),  
-        ('hidden5', layers.DenseLayer),
-        ('output', layers.DenseLayer),
+        ('dropout3', DropoutLayer),  
+        ('hidden4', DenseLayer),
+        ('dropout4', DropoutLayer),  
+        ('hidden5', DenseLayer),
+        ('output', DenseLayer),
         ]
     return layers
  
