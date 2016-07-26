@@ -2,6 +2,7 @@
 # Taken mostly from https://jessesw.com/Deep-Learning/
 
 from scipy.ndimage import convolve, rotate
+import numpy as np
 
 def random_image_generator(image_stack):
     '''

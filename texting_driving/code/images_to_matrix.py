@@ -18,7 +18,7 @@ import pandas as pd
 from scipy.misc import imread 
 from scipy.ndimage.interpolation import zoom
 
-def readImage(path, reduction_factor=.1):
+def readImage(path, reduction_factor=.15):
     """
     - Reduces photo size by a factor of 1/reduction_factor
     - Converts to greyscale 
@@ -26,7 +26,7 @@ def readImage(path, reduction_factor=.1):
     grey_image = imread(path, flatten=True)
     return zoom(grey_image, reduction_factor)
 
-def toMatrix(paths, num_frames, imgsize=(108, 192)):
+def toMatrix(paths, num_frames, imgsize=(81, 144)):
     """
     - num_samples x num_frames x length x width array 
     """
@@ -41,7 +41,7 @@ def toMatrix(paths, num_frames, imgsize=(108, 192)):
         print('Finished Processing Sample ' + str(sample_index))
     return images_by_time
 
-def to3DMatrix(paths, imgsize=(108, 192)):
+def to3DMatrix(paths, imgsize=(81, 144)):
     """
     - len(paths) x length x width array 
     """
@@ -109,11 +109,11 @@ if __name__ == '__main__':
     
     # Shuffle data
     # Check to make sure this matches images_by_time --> might need to pad ends w/ extra labels 
-    num_samples = images_by_time.shape[0]
-    indcs = np.arange(num_samples)
-    np.random.shuffle(indcs)
-    images_by_time = images_by_time[indcs]
-    labels = labels[indcs]
+    # num_samples = images_by_time.shape[0]
+    # indcs = np.arange(num_samples)
+    # np.random.shuffle(indcs)
+    # images_by_time = images_by_time[indcs]
+    # labels = labels[indcs]
 
     # Save in data folder 
     np.save('../data/train/images_by_time_mat', images_by_time)
