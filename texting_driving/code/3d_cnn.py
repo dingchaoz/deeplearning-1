@@ -35,42 +35,31 @@ from nolearn.lasagne import BatchIterator
 
 from random_image_generator import * 
 
-# TODO: Fix up/verify arch. and sizes 
-def build_cnn(): #Change take as input image size 
+def build_layers():  
     """
-    Builds a 3D spatio-temporal CNN 
+    Builds layers for a 3D spatio-temporal CNN 
     Returns
     -------
-    dict
-        A dictionary containing the network layers, where the output layer is at key 'output'
+    list
+        A list containing the network layers, where the output layer is at key 'output'
     """
-    net = {}
-    net['input'] = InputLayer((None, 1, 10, 108, 192))
-
-    # ----------- 1st Conv layer group ---------------
-    net['conv1a'] = Conv3DDNNLayer(net['input'], 32, (3,3,3), pad=1,nonlinearity=lasagne.nonlinearities.rectify,flip_filters=False)
-    net['pool1']  = MaxPool3DDNNLayer(net['conv1a'],pool_size=(1,2,2),stride=(1,2,2))
-    net['dropout1'] = DropoutLayer(net['pool1'], p=.1)
-
-    # ------------- 2nd Conv layer group --------------
-    net['conv2a'] = Conv3DDNNLayer(net['dropout1'], 64, (3,3,3), pad=1,nonlinearity=lasagne.nonlinearities.rectify)
-    net['pool2']  = MaxPool3DDNNLayer(net['conv2a'],pool_size=(2,2,2),stride=(2,2,2))
-    net['dropout2'] = DropoutLayer(net['pool2'], p=.3)
-
-    # ----------------- 3rd Conv layer group --------------
-    net['conv3a'] = Conv3DDNNLayer(net['dropout2'], 128, (3,3,3), pad=1,nonlinearity=lasagne.nonlinearities.rectify)
-    net['pool3']  = MaxPool3DDNNLayer(net['conv3a'],pool_size=(2,2,2),stride=(2,2,2))
-    net['dropout3'] = DropoutLayer(net['pool3'], p=.5)
-
-    # ----------------- Dense Layers -----------------
-    net['fc4']  = DenseLayer(net['dropout3'], num_units=256,nonlinearity=lasagne.nonlinearities.rectify)
-    net['dropout4'] = DropoutLayer(net['fc4'], p=.5)
-    net['fc5']  = DenseLayer(net['dropout4'], num_units=256,nonlinearity=lasagne.nonlinearities.rectify)
-
-    # ----------------- Output Layer -----------------
-    net['output']  = DenseLayer(net['fc5'], num_units=256, nonlinearity=None)
-
-    return net
+    layers=[
+        ('input', InputLayer),
+        ('conv1', Conv3DDNNLayer),
+        ('pool1', MaxPool3DDNNLayer),
+        ('dropout1', layers.DropoutLayer),  
+        ('conv2', Conv3DDNNLayer),
+        ('pool2', MaxPool3DDNNLayer),
+        ('dropout2', layers.DropoutLayer),  
+        ('conv3', Conv3DDNNLayer),
+        ('pool3', MaxPool3DDNNLayer),
+        ('dropout3', layers.DropoutLayer),  
+        ('hidden4', layers.DenseLayer),
+        ('dropout4', layers.DropoutLayer),  
+        ('hidden5', layers.DenseLayer),
+        ('output', layers.DenseLayer),
+        ]
+    return layers
  
 class AdjustVariable(object):
     """
@@ -101,14 +90,11 @@ class FlipBatchIterator(BatchIterator):
         bs = Xb.shape[0]
         num_changes = int(bs * .75)
         indices = np.random.choice(bs, num_changes, replace=False)
-        distorts_per_cat = int(len(indices) / 4)
+        print(indices)
+        distorts_per_cat = int(len(indices) / 2)
         flip_indcs = indices[0:distorts_per_cat]
-        flip_indcs2 = indices[distorts_per_cat:(2*distorts_per_cat)]
-        flip_indcs3 = indices[(2*distorts_per_cat):(3*distorts_per_cat)]
-        rotate_indcs = indices[(3*distorts_per_cat):(4*distorts_per_cat)]
-        Xb[flip_indcs] = Xb[flip_indcs, :, ::-1, :] #Verify good flip 
-        Xb[flip_indcs2] = Xb[flip_indcs2, :, :, ::-1] 
-        Xb[flip_indcs3] = Xb[flip_indcs3, :, ::-1, ::-1]
+        rotate_indcs = indices[distorts_per_cat:(2*distorts_per_cat)]
+        Xb[flip_indcs] = Xb[flip_indcs, :, :, ::-1] #Verify good flip 
         for i in rotate_indcs:
             Xb[i, :, :, :] = random_image_generator(Xb[i, :, :, :])
         return Xb, yb
@@ -132,7 +118,7 @@ class EarlyStopping(object):
         # Save weights every 20 epochs to server (transport to s3 eventually)
         if self.num_epochs % 20 == 0:
             weights = nn.get_all_params_values()
-            weight_path = '../data/train/weights/cnn' + self.num_epochs
+            weight_path = '../data/train/weights/cnn' + str(self.num_epochs)
             with open(weight_path, 'wb') as f:
                 pickle.dump(weights, f, -1)
 
@@ -142,27 +128,31 @@ class EarlyStopping(object):
             self.best_valid_epoch = current_epoch
             self.best_weights = nn.get_all_params_values()
         
-        # Seems like we might be starting to overfit 
+        # Seems like we might be starting to overfit, stop updating   
         elif self.best_valid_epoch + self.patience < current_epoch:
             print("Early stopping.")
             print("Best valid loss was {:.6f} at epoch {}.".format(
                 self.best_valid, self.best_valid_epoch))
             nn.load_params_from(self.best_weights)
             raise StopIteration()
-
-# Fix but make sure to multiply by different p's b/c dropout 
-def predict(X):
-  # ensembled forward pass
-  H1 = np.maximum(0, np.dot(W1, X) + b1) * p # NOTE: scale the activations
-  H2 = np.maximum(0, np.dot(W2, H1) + b2) * p # NOTE: scale the activations
-  out = np.dot(W3, H2) + b3
  
 # Build CNN
-layers = build_cnn()
+
+layers = build_layers()
 
 network = NeuralNet(
-    layers=layers['output'],
-    max_epochs=5000,
+    layers=layers,
+    input_shape = (None, 10, 81, 144),
+    conv1_num_filters=32, conv1_filter_size=(3, 3, 3), pool1_pool_size=(1, 2, 2),
+    dropout1_p=0.1, 
+    conv2_num_filters=64, conv2_filter_size=(3, 3, 3), pool2_pool_size=(2, 2, 2),
+    dropout2_p=0.2,  
+    conv3_num_filters=128, conv3_filter_size=(3, 3, 3), pool3_pool_size=(2, 2, 2),
+    dropout3_p=0.3,  
+    hidden4_num_units=500,
+    dropout4_p=0.5,  
+    hidden5_num_units=500,
+    output_num_units=500, output_nonlinearity=None,
     
     update=nesterov_momentum,
     objective_loss_function=binary_hinge_loss,
@@ -173,19 +163,30 @@ network = NeuralNet(
     regression=False,
     batch_iterator_train=FlipBatchIterator(batch_size=128, shuffle=False) #Data already shuffled 
     on_epoch_finished=[
-        AdjustVariable('update_learning_rate', start=0.03, stop=0.0001),
+        AdjustVariable('update_learning_rate', start=0.03, stop=0.00001),
         AdjustVariable('update_momentum', start=0.9, stop=0.999),
         EarlyStopping(patience=200)
         ],
-
+    max_epochs=10000,
     verbose=1
 )
 
 if __name__ == '__main__':
 
     # Load data (did not standardize b/c images in 0-256)
-    X = np.load('./data/train/images_by_time_mat.npy') 
-    Y = np.load('./data/train/labels.npy')
+    X = np.load('../data/train/images_by_time_mat.npy') 
+    Y = np.load('../data/train/labels.npy')
+
+    # Shuffle data (already shuffled before. if not uncomment)
+    # num_samps = X.shape[0]
+    # indcs = np.arange(num_samps)
+    # np.random.shuffle(indcs)
+    # X = X[indcs]
+    # Y = Y[indcs]
+
+    # Convert Y into a binary vector 
+    Y[Y == 2] = 1
+    Y[Y == 3] = 0 
 
     # Fit model 
     network.fit(X, Y)
