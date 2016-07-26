@@ -185,8 +185,8 @@ if __name__ == '__main__':
     # Y = Y[indcs]
 
     # Convert Y into a binary vector 
-    Y[Y == 2] = 1
-    Y[Y == 3] = 0 
+    Y[Y == 2] = 1 #1466 total 1s
+    Y[Y == 3] = 0 #1598 total 0s 
 
     # Fit model 
     network.fit(X, Y)
