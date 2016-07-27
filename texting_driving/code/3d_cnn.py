@@ -144,7 +144,7 @@ network = NeuralNet(
     dropout1_p=0.1, 
     conv2_num_filters=64, conv2_filter_size=(3, 3, 3), pool2_pool_size=(2, 2, 2),
     dropout2_p=0.2,  
-    conv3_num_filters=128, conv3_filter_size=(3, 3, 3), pool3_pool_size=(2, 2, 2),
+    conv3_num_filters=128, conv3_filter_size=(3, 3, 3), pool3_pool_size=(1, 2, 2),
     dropout3_p=0.3,  
     hidden4_num_units=500,
     dropout4_p=0.5,  
@@ -182,7 +182,8 @@ if __name__ == '__main__':
     # Y = Y[indcs]
 
     # Convert Y into a binary vector 
-    Y[Y == 2] = 1 #1466 total 1s
+    # 0 means nothing, 1 only driver text, 2 both text, 3 only passanger text
+    Y[Y == 2] = 1 #1466 total 1s 
     Y[Y == 3] = 0 #1598 total 0s 
 
     # Fit model 
