@@ -12,8 +12,6 @@
 # References: See paper. Special thanks to Daniel Nouri for his tutorial at 
 # http://danielnouri.org/notes/category/machine-learning/ 
 
-# TODO: check this and prev code for say 20/5 = 4.0 convert to int 
-
 from __future__ import division 
 
 import lasagne
@@ -31,6 +29,9 @@ from nolearn.lasagne import NeuralNet
 from nolearn.lasagne import BatchIterator
 
 from random_image_generator import * 
+
+def float32(k):
+    return np.cast['float32'](k)
 
 def build_layers():  
     """
@@ -139,7 +140,7 @@ layers = build_layers()
 
 network = NeuralNet(
     layers=layers,
-    input_shape = (None, 10, 81, 144),
+    input_shape = (None, 1, 10, 81, 144),
     conv1_num_filters=32, conv1_filter_size=(3, 3, 3), pool1_pool_size=(1, 2, 2),
     dropout1_p=0.1, 
     conv2_num_filters=64, conv2_filter_size=(3, 3, 3), pool2_pool_size=(2, 2, 2),
