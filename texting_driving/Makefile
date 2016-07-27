@@ -1,4 +1,3 @@
-
 data:
     cd code && 
     mkdir ../data/train/images && 
@@ -10,5 +9,3 @@ run_model:
     cd code && 
     python 3d_cnn.py && 
     cd .. 
-
-
