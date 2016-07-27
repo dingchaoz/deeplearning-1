@@ -168,6 +168,7 @@ network = NeuralNet(
 )
 
 # Uncomment if you want to see network's final dimensions 
+
 # network.initialize()
 # layer_info = PrintLayerInfo()
 # layer_info(network)
