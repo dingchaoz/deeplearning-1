@@ -6,7 +6,7 @@
 # Quick Architectural Overview:
 # - 3 convolutional layers (ReLu, Dropout, MaxPooling), 2 dense layers
 # - Binary Hinge-Loss 
-# - Nesterov Momentum update w/ learning rate decaying linearly w/ num. epochs 
+# - Adam update  
 # - Early Stopping 
 
 # References: See paper. Special thanks to Daniel Nouri for his tutorial at 
@@ -14,6 +14,7 @@
 
 from __future__ import division 
 
+import sys
 import lasagne
 import theano
 import numpy as np
@@ -22,11 +23,12 @@ import cPickle as pickle
 from lasagne.layers import InputLayer, DenseLayer, NonlinearityLayer, DropoutLayer
 from lasagne.layers.dnn import Conv3DDNNLayer, MaxPool3DDNNLayer
 from lasagne.objectives import binary_hinge_loss
-from lasagne.updates import nesterov_momentum
+from lasagne.updates import adam
 from lasagne import layers
 
 from nolearn.lasagne import NeuralNet
 from nolearn.lasagne import BatchIterator
+from nolearn.lasagne import PrintLayerInfo
 
 from random_image_generator import * 
 
@@ -58,7 +60,9 @@ def build_layers():
         ('output', DenseLayer),
         ]
     return layers
- 
+
+# Did not use - if want to use Nesterov update w/ linearly decaying learning 
+# rate use this class - see tutorial at top for details  
 class AdjustVariable(object):
     """
     Class controlling how to tune the momentum and learning rate
@@ -97,7 +101,6 @@ class FlipBatchIterator(BatchIterator):
             Xb[i, :, :, :] = random_image_generator(Xb[i, :, :, :])
         return Xb, yb
 
-# maybe set number of max_epochs high since then will just
 class EarlyStopping(object):
     """
     """
@@ -152,24 +155,27 @@ network = NeuralNet(
     hidden5_num_units=500,
     output_num_units=500, output_nonlinearity=None,
     
-    update=nesterov_momentum,
+    update=adam,
     objective_loss_function=binary_hinge_loss,
-
-    update_learning_rate=theano.shared(float32(0.03)),
-    update_momentum=theano.shared(float32(0.9)),
     
     regression=False,
-    batch_iterator_train=FlipBatchIterator(batch_size=128, shuffle=False) #Data already shuffled 
+    batch_iterator_train=FlipBatchIterator(batch_size=128, shuffle=False), #Data already shuffled 
     on_epoch_finished=[
-        AdjustVariable('update_learning_rate', start=0.03, stop=0.00001),
-        AdjustVariable('update_momentum', start=0.9, stop=0.999),
-        EarlyStopping(patience=200)
+        EarlyStopping(patience=200) #If want to update learning rate, put here 
         ],
     max_epochs=10000,
     verbose=1
 )
 
+# Uncomment if you want to see network's final dimensions 
+# network.initialize()
+# layer_info = PrintLayerInfo()
+# layer_info(network)
+
 if __name__ == '__main__':
+
+    #Large network, need to increase Python's recursion limit
+    sys.setrecursionlimit(10000)
 
     # Load data (did not standardize b/c images in 0-256)
     X = np.load('../data/train/images_by_time_mat.npy') 
