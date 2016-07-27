@@ -15,7 +15,7 @@ a video stream.
 - $pip install -r https://raw.githubusercontent.com/Lasagne/Lasagne/master/requirements.txt
 - $pip install https://github.com/Lasagne/Lasagne/archive/master.zip
 - $pip install -r https://raw.githubusercontent.com/dnouri/nolearn/master/requirements.txt
-- pip install git+https://github.com/dnouri/nolearn.git@master#egg=nolearn==0.7.git
+- $pip install git+https://github.com/dnouri/nolearn.git@master#egg=nolearn==0.7.git
 - To make sure everything installed correctly, run $python -c "import theano; print theano.sandbox.cuda.dnn.dnn_available()"
 - Make sure you see an output of True
 - Clone this repository and cd into texting_driving directory 
