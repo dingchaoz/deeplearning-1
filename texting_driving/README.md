@@ -19,7 +19,7 @@ a video stream.
 - To make sure everything installed correctly, run $python -c "import theano; print theano.sandbox.cuda.dnn.dnn_available()"
 - Make sure you see an output of True
 - Clone this repository and cd into texting_driving directory 
-- In the code directory place the texing_driving.MOV file
+- In the code directory place the texting_driving.MOV file
 - Run $make data 
 - Run $make run_model  
 - Note: For more detailed instructions see http://machinelearningmastery.com/develop-evaluate-large-deep-learning-models-keras-amazon-web-services/
