@@ -5,7 +5,7 @@
 
 # Quick Architectural Overview:
 # - 3 convolutional layers (ReLu, Dropout, MaxPooling), 2 dense layers
-# - Binary Hinge-Loss 
+# - Binary Cross-entropy 
 # - Adam update  
 # - Early Stopping 
 
@@ -20,9 +20,10 @@ import theano
 import numpy as np
 import cPickle as pickle
 
+from lasagne.nonlinearities import softmax
 from lasagne.layers import InputLayer, DenseLayer, NonlinearityLayer, DropoutLayer
 from lasagne.layers.dnn import Conv3DDNNLayer, MaxPool3DDNNLayer
-from lasagne.objectives import binary_hinge_loss
+from lasagne.objectives import binary_crossentropy
 from lasagne.updates import adam
 from lasagne import layers
 
@@ -92,13 +93,12 @@ class FlipBatchIterator(BatchIterator):
         bs = Xb.shape[0]
         num_changes = int(bs * .75)
         indices = np.random.choice(bs, num_changes, replace=False)
-        print(indices)
         distorts_per_cat = int(len(indices) / 2)
         flip_indcs = indices[0:distorts_per_cat]
         rotate_indcs = indices[distorts_per_cat:(2*distorts_per_cat)]
         Xb[flip_indcs] = Xb[flip_indcs, :, :, ::-1] #Verify good flip 
         for i in rotate_indcs:
-            Xb[i, :, :, :] = random_image_generator(Xb[i, :, :, :])
+            Xb[i, :, :, :, :] = random_image_generator(Xb[i, :, :, :, :])
         return Xb, yb
 
 class EarlyStopping(object):
@@ -143,7 +143,7 @@ layers = build_layers()
 
 network = NeuralNet(
     layers=layers,
-    input_shape = (None, 1, 10, 81, 144),
+    input_shape = (None, 1, 10, 81, 144), #Batch size of 32 
     conv1_num_filters=32, conv1_filter_size=(3, 3, 3), pool1_pool_size=(1, 2, 2),
     dropout1_p=0.1, 
     conv2_num_filters=64, conv2_filter_size=(3, 3, 3), pool2_pool_size=(2, 2, 2),
@@ -153,13 +153,13 @@ network = NeuralNet(
     hidden4_num_units=500,
     dropout4_p=0.5,  
     hidden5_num_units=500,
-    output_num_units=500, output_nonlinearity=None,
+    output_num_units=2, output_nonlinearity=softmax,
     
     update=adam,
-    objective_loss_function=binary_hinge_loss,
+    objective_loss_function=binary_crossentropy,
     
     regression=False,
-    batch_iterator_train=FlipBatchIterator(batch_size=128, shuffle=False), #Data already shuffled 
+    batch_iterator_train=FlipBatchIterator(batch_size=32, shuffle=False), #Data already shuffled 
     on_epoch_finished=[
         EarlyStopping(patience=200) #If want to update learning rate, put here 
         ],
@@ -179,7 +179,12 @@ if __name__ == '__main__':
     sys.setrecursionlimit(10000)
 
     # Load data (did not standardize b/c images in 0-256)
-    X = np.load('../data/train/images_by_time_mat.npy') 
+    X = np.load('../data/train/images_by_time_mat.npy')
+    X = X.astype(np.float32)
+    X.shape = (3064, 1, 10, 81, 144) # FIX hardcoded - make general  
+
+    # Only have 1 channel, need to reshape in order to match 5d required input 
+    
     Y = np.load('../data/train/labels.npy')
 
     # Shuffle data (already shuffled before. if not uncomment)
@@ -193,6 +198,7 @@ if __name__ == '__main__':
     # 0 means nothing, 1 only driver text, 2 both text, 3 only passanger text
     Y[Y == 2] = 1 #1466 total 1s 
     Y[Y == 3] = 0 #1598 total 0s 
+    Y = Y.astype(np.int32)
 
     # Fit model 
     network.fit(X, Y)

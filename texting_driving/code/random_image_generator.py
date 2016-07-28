@@ -8,9 +8,9 @@ def random_image_generator(image_stack):
     '''
     This function will randomly translate and rotate an image, producing a new, altered version as output.
     '''
-    num_frames = image_stack.shape[0]
-    length = image_stack.shape[1]
-    width = image_stack.shape[2]
+    num_frames = image_stack.shape[1]
+    length = image_stack.shape[2]
+    width = image_stack.shape[3]
     # Create our movement vectors for translation first. 
         
     move_up = [[0, 1, 0],
@@ -42,10 +42,10 @@ def random_image_generator(image_stack):
     angle = np.random.randint(-30,31)
         
     # Move the random direction and change the pixel data back to a 2D shape.
-    new_image = np.zeros(shape=(num_frames,length, width))
-    for i, image in enumerate(image_stack):
+    new_image = np.zeros(shape=(1, num_frames,length, width))
+    for i, image in enumerate(image_stack[0, :, :, :]):
         moved = convolve(image.reshape(length,width), direction, mode = 'constant')
         # Rotate the image
         rotated = rotate(moved, angle, reshape = False)
-        new_image[i, :, :] = rotated
+        new_image[0, i, :, :] = rotated
     return new_image
